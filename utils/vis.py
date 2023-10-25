@@ -145,8 +145,12 @@ def vis_nuscene():
 
     # If you want to vis the data file provided in GitHub, use the code below
     file = "data/29796060110c4163b07f06eff4af0753/labels.npz" # change this to the file path on your machine
+    # file = "data/occ3d-nus/gts/scene-0001/1e19d0a5189b46f4b62aa47508f2983e/labels.npz"
     data = np.load(file)
     semantics, mask_lidar, mask_camera = data['semantics'], data['mask_lidar'], data['mask_camera']
+
+    print(semantics.shape, semantics.min(), semantics.max(), semantics.dtype)
+    print(semantics.astype(int).min(), semantics.astype(int).max())
 
     # If you want to vis the gt files in mini & trainval, use the code below
     # file_gt = 'data/gts/scene-0061/0cd661df01aa40c3bb3a773ba86f753a' # change this to the gt folder path on your machine
@@ -160,9 +164,12 @@ def vis_nuscene():
     voxels = semantics
 
     points, labels = voxel2points(voxels, voxelSize, range=point_cloud_range, ignore_labels=ignore_labels)
+    print(points.shape, labels.shape)
+    exit()
     points = points.numpy()
     labels = labels.numpy()
     pcd_colors = color[labels.astype(int) % len(color)]
+    print(np.unique(labels))
     bboxes = voxel_profile(torch.tensor(points), voxelSize)
     ego_pcd = o3d.geometry.PointCloud()
     ego_points = generate_the_ego_car()
