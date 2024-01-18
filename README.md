@@ -15,9 +15,43 @@
 
 </div>
 
+## Introduction
+Understanding the 3D surroundings including the background stuffs and foreground objects is important for autonomous driving. In the traditional 3D object detection task, a foreground object is represented by the 3D bounding box. However, the geometrical shape of the object is complex, which can not be represented by a simple 3D box, and the perception of the background stuffs is absent. The goal of this task is to predict the 3D occupancy of the scene. In this task, we provide a large-scale occupancy benchmark based on the nuScenes dataset. The benchmark is a voxelized representation of the 3D space, and the occupancy state and semantics of the voxel in 3D space are jointly estimated in this task. The complexity of this task lies in the dense prediction of 3D space given the surround-view images.
+
+If you use the challenge dataset in your paper, please consider citing OccNet and Occ3D with the following BibTex:
+```bibtex
+@article{sima2023_occnet,
+      title={Scene as Occupancy},
+      author=author={Chonghao Sima and Wenwen Tong and Tai Wang and Li Chen and Silei Wu and Hanming Deng and Yi Gu and Lewei Lu and Ping Luo and Dahua Lin and Hongyang Li},
+      year={2023},
+      eprint={2306.02851},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
+```bibtex
+@article{tian2023occ3d,
+  title={Occ3D: A Large-Scale 3D Occupancy Prediction Benchmark for Autonomous Driving},
+  author={Tian, Xiaoyu and Jiang, Tao and Yun, Longfei and Wang, Yue and Wang, Yilun and Zhao, Hang},
+  journal={arXiv preprint arXiv:2304.14365},
+  year={2023}
+}
+```
+
+## Leaderboard 
+
+### 3D Occupancy Prediction Challenge at CVPR 2023 (Server remains `active`)
+Please refer to [this link](https://opendrivelab.com/AD23Challenge.html#Track3). If you wish to add new / modify results to the leaderboard, please drop us an email to <a href="mailto:contact@opendrivelab.com">contact@opendrivelab.com</a>
+- Challenge webiste: [https://opendrivelab.com/AD23Challenge.html](https://opendrivelab.com/AD23Challenge.html)
+  
+Top 10 at a glance by June 10 2023. 
+![teaser](figs/leaderboard-06-10-2023.png)
+
 ## Table of Contents
 - [CVPR 2023 Occupancy Prediction Challenge](#cvpr-2023-occupancy-prediction-challenge)
   - [Introduction](#introduction)
+  - [Leaderboard](#leaderboard)
   - [Task Definition](#task-definition)
     - [Rules for Occupancy Challenge](#rules-for-occupancy-challenge)
   - [Evaluation Metrics](#evaluation-metrics)
@@ -31,16 +65,11 @@
   - [Getting Started](#getting-started)
   - [Submission](#submission)
   - [Timeline](#challenge-timeline)
-  - [Leaderboard](#leaderboard)
   - [License](#license)
 
-
-## Introduction
-Understanding the 3D surroundings including the background stuffs and foreground objects is important for autonomous driving. In the traditional 3D object detection task, a foreground object is represented by the 3D bounding box. However, the geometrical shape of the object is complex, which can not be represented by a simple 3D box, and the perception of the background is absent. The goal of this task is to predict the 3D occupancy of the scene. In this task, we provide a large-scale occupancy benchmark based on the nuScenes dataset. The benchmark is a voxelized representation of the 3D space, and the occupancy state and semantics of the voxel in 3D space are jointly estimated in this task. The complexity of this task lies in the dense prediction of 3D space given the surround-view image.
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 ## Changelog
+* June 1: Challenge closed! Please refer to the final leaderboard at [here](https://opendrivelab.com/AD23Challenge.html#Track3).
+* May 16: Note that it is a must to append a correct **email** address and other information to validate your submissions in the [Challenge](https://opendrivelab.com/AD23Challenge.html#rules).❗
 * May 12: The [evaluation server](https://eval.ai/web/challenges/challenge-page/2045) is finally online! Check out [submission format](#submission) 
 * April 18: 🚀 A strong baseline based on [InternImage](https://github.com/OpenGVLab/InternImage) released. Check out [here](https://github.com/OpenGVLab/InternImage/tree/master/autonomous_driving/occupancy_prediction).
 * April 13: we add visualization code under utils/vis.py. And we add rules about using other datasets as well as future frame. Please take a look at the rule section and strickly follow them.
@@ -91,7 +120,7 @@ Figure 1. Semantic labels (left), visibility masks in the LiDAR (middle) and the
 | mini            | 404 |
 | train           | 28,130 |
 | val             | 6,019 |
-| test            | 6,006 |
+| test            | 6,008 |
 | cameras         | 6 |
 | voxel size      | 0.4m |
 | range           | [-40m, -40m, -1m, 40m, 40m, 5.4m]|
@@ -102,7 +131,7 @@ Figure 1. Semantic labels (left), visibility masks in the LiDAR (middle) and the
 
 - The dataset contains 18 classes. The definition of classes from 0 to 16 is the same as the [nuScenes-lidarseg](https://github.com/nutonomy/nuscenes-devkit/blob/fcc41628d41060b3c1a86928751e5a571d2fc2fa/python-sdk/nuscenes/eval/lidarseg/README.md) dataset. The label 17 category represents voxels that are not occupied by anything, which is named as `free`. Voxel semantics for each sample frame is given as `[semantics]` in the labels.npz. 
 
-- <strong>How are the labels annotated?</strong> The ground truth labels of occupancy derive from accumulative LiDAR scans with human annotations. 
+- <strong>How are the labels annotated?</strong> The ground truth labels of occupancy derive from accumulative LiDAR scans with human annotations, and we annotate the occupancy in the ego coordinate system. 
   - If a voxel reflects a LiDAR point, then it is assigned as the same semantic label as the LiDAR point;
   - If a LiDAR beam passes through a voxel in the air, the voxel is set to be `free`;
   - Otherwise, we set the voxel to be unknown, or unobserved. This happens due to the sparsity of the LiDAR or the voxel is occluded, e.g. by a wall. In the dataset, `[mask_lidar]` is a 0-1 binary mask, where 0's represent unobserved voxels. As shown in Fig.1(b), grey voxels are unobserved. Due to the limitation of the visualization tool, we only show unobserved voxels at the same height as the ground. 
@@ -242,15 +271,11 @@ zip -r occ_submission.zip results_folder
 
 ## Challenge Timeline
 - May 12, 2023 - Challenge Period Open.
-- Jun 01, 2023 11:59:00 PM CST - Challenge Period End.
+- Jun 01, 2023 11:59:00 PM CST(UTC+8) - Challenge Period End.
 - Jun 03, 2023 - Finalist Notification.
 - Jun 10, 2023 - Technical Report Deadline.
 - Jun 12, 2023 - Winner Announcement.
-<p align="right">(<a href="#top">back to top</a>)</p>
 
-
-## Leaderboard 
-Please refer to [this link](https://eval.ai/web/challenges/challenge-page/2045/leaderboard).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
