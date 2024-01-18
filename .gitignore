@@ -5,3 +5,4 @@ data/gts.tar.gz
 data/imgs.tar.gz
 data/**/*.npz
 data/**/*.jpg
+**/__pycache__/
