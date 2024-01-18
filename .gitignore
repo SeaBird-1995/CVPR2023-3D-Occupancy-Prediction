@@ -6,3 +6,6 @@ data/imgs.tar.gz
 data/**/*.npz
 data/**/*.jpg
 **/__pycache__/
+ckpts/
+work_dirs/
+data/
