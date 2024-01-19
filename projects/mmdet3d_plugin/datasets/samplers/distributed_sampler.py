@@ -39,3 +39,17 @@ class DistributedSampler(_DistributedSampler):
         assert len(indices) == self.num_samples
 
         return iter(indices)
+
+
+@SAMPLER.register_module()
+class PytorchDistributedSampler(_DistributedSampler):
+
+    def __init__(self,
+                 dataset=None,
+                 num_replicas=None,
+                 rank=None,
+                 shuffle=True,
+                 seed=0,
+                 samples_per_gpu=1):
+        super().__init__(
+            dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)

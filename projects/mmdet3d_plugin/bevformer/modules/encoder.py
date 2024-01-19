@@ -408,6 +408,139 @@ class BEVFormerLayer(MyCustomBaseTransformerLayer):
         return query
 
 
+def get_reference_points(H, W, Z=8, num_points_in_pillar=4, dim='3d', bs=1, device='cuda', dtype=torch.float):
+    """Get the reference points used in SCA and TSA.
+    Args:
+        H, W: spatial shape of bev.
+        Z: hight of pillar.
+        D: sample D points uniformly from each pillar.
+        device (obj:`device`): The device where
+            reference_points should be.
+    Returns:
+        Tensor: reference points used in decoder, has \
+            shape (bs, num_keys, num_levels, 2).
+    """
+    # reference points on 2D bev plane, used in temporal self-attention (TSA).
+    ref_y, ref_x = torch.meshgrid(
+        torch.linspace(
+            0.5, H - 0.5, H, dtype=dtype, device=device),
+        torch.linspace(
+            0.5, W - 0.5, W, dtype=dtype, device=device)
+    )
+    ref_y = ref_y.reshape(-1)[None] / H
+    ref_x = ref_x.reshape(-1)[None] / W
+    ref_2d = torch.stack((ref_x, ref_y), -1)
+    ref_2d = ref_2d.repeat(bs, 1, 1).unsqueeze(2)
+    return ref_2d
+
+
+@TRANSFORMER_LAYER_SEQUENCE.register_module()
+class BEVFormerOccEncoder(TransformerLayerSequence):
+
+    """
+    Modify the original BEVFormerEncoder to accept the Occupancy Feature inputs.
+    Args:
+        return_intermediate (bool): Whether to return intermediate outputs.
+        coder_norm_cfg (dict): Config of last normalization layer. Default：
+            `LN`.
+    """
+
+    def __init__(self, 
+                 *args, 
+                 pc_range=None, 
+                 return_intermediate=False,
+                 **kwargs):
+
+        super(BEVFormerOccEncoder, self).__init__(*args, **kwargs)
+        self.return_intermediate = return_intermediate
+
+        self.pc_range = pc_range
+        self.fp16_enabled = False
+
+    @auto_fp16()
+    def forward(self,
+                bev_query,
+                key,
+                value,
+                *args,
+                bev_h=None,
+                bev_w=None,
+                bev_pos=None,
+                spatial_shapes=None,
+                level_start_index=None,
+                valid_ratios=None,
+                prev_bev=None,
+                shift=0.,
+                **kwargs):
+        """Forward function for `TransformerDecoder`.
+        Args:
+            bev_query (Tensor): Input BEV query with shape
+                `(num_query, bs, embed_dims)`.
+            key & value (Tensor): Input multi-cameta features with shape
+                (num_cam, num_value, bs, embed_dims)
+            reference_points (Tensor): The reference
+                points of offset. has shape
+                (bs, num_query, 4) when as_two_stage,
+                otherwise has shape ((bs, num_query, 2).
+            valid_ratios (Tensor): The radios of valid
+                points on the feature map, has shape
+                (bs, num_levels, 2)
+        Returns:
+            Tensor: Results with shape [1, num_query, bs, embed_dims] when
+                return_intermediate is `False`, otherwise it has shape
+                [num_layers, num_query, bs, embed_dims].
+        """
+
+        output = bev_query
+        intermediate = []
+
+        ref_2d = get_reference_points(
+            bev_h, bev_w, dim='2d', bs=bev_query.size(1), 
+            device=bev_query.device, dtype=bev_query.dtype)
+
+        shift_ref_2d = ref_2d.clone()
+        shift_ref_2d += shift[:, None, None, :]
+
+        # (num_query, bs, embed_dims) -> (bs, num_query, embed_dims)
+        bev_query = bev_query.permute(1, 0, 2)
+        bev_pos = bev_pos.permute(1, 0, 2)
+        bs, len_bev, num_bev_level, _ = ref_2d.shape
+        if prev_bev is not None:
+            prev_bev = prev_bev.permute(1, 0, 2)
+            prev_bev = torch.stack(
+                [prev_bev, bev_query], 1).reshape(bs*2, len_bev, -1)
+            hybird_ref_2d = torch.stack([shift_ref_2d, ref_2d], 1).reshape(
+                bs*2, len_bev, num_bev_level, 2)
+        else:
+            hybird_ref_2d = torch.stack([ref_2d, ref_2d], 1).reshape(
+                bs*2, len_bev, num_bev_level, 2)
+
+        for lid, layer in enumerate(self.layers):
+            output = layer(
+                bev_query,
+                key,
+                value,
+                *args,
+                bev_pos=bev_pos,
+                ref_2d=hybird_ref_2d,
+                ref_3d=ref_2d,
+                bev_h=bev_h,
+                bev_w=bev_w,
+                spatial_shapes=spatial_shapes,
+                level_start_index=level_start_index,
+                reference_points_cam=ref_2d,
+                prev_bev=prev_bev,
+                **kwargs)
+
+            bev_query = output
+            if self.return_intermediate:
+                intermediate.append(output)
+
+        if self.return_intermediate:
+            return torch.stack(intermediate)
+
+        return output
+
 @TRANSFORMER_LAYER_SEQUENCE.register_module()
 class BEVPredictorEncoder(TransformerLayerSequence):
 
