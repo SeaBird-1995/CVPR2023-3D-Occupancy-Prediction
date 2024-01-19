@@ -85,6 +85,25 @@ class NuScenesViDARDataset(NuSceneOcc):
         self.version = self.metadata['version']
         return data_infos
     
+    def choose_data(self, index):
+        if not self.test_mode:  # train
+            index = index % len(self.origin_data_infos)
+            scene_name = self.scene_names[index]
+            scene_len = self.scene_lens[index]
+            idx = np.random.randint(0, scene_len - self.return_len - self.offset + 1)
+        else:
+            for i, scene_len in enumerate(self.scene_lens):
+                if index < scene_len:
+                    scene_name = self.scene_names[i]
+                    idx = index
+                    break
+                else:
+                    index -= scene_len
+        
+        index_list = list(range(self.return_len + self.offset))
+        index_list = [idx + i for i in index_list]
+        return scene_name, index_list
+
     def prepare_train_data(self, index):
         """
         Training data preparation.
@@ -93,19 +112,9 @@ class NuScenesViDARDataset(NuSceneOcc):
         Returns:
             dict: Training data dict of the corresponding index.
         """
-        ## TODO, do not use the loop
-        for i, scene_len in enumerate(self.scene_lens):
-            if index < scene_len:
-                scene_name = self.scene_names[i]
-                idx = index
-                break
-            else:
-                index -= scene_len
-        
+        scene_name, index_list = self.choose_data(index)
         self.data_infos = self.origin_data_infos[scene_name]
 
-        index_list = list(range(self.return_len + self.offset))
-        index_list = [idx + i for i in index_list]
         queue = []
         for i in index_list:
             i = max(0, i)
