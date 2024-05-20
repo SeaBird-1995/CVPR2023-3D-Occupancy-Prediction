@@ -4,6 +4,8 @@ import mmcv
 from mmdet.datasets.builder import PIPELINES
 from mmcv.parallel import DataContainer as DC
 import os
+import torch
+
 
 @PIPELINES.register_module()
 class LoadOccGTFromFile(object):
@@ -49,3 +51,39 @@ class LoadOccGTFromFile(object):
         """str: Return a string that describes the module."""
         return "{} (data_root={}')".format(
             self.__class__.__name__, self.data_root)
+    
+
+def openscene_occ_to_voxel(occ_data,
+                           point_cloud_range=[-50.0, -50.0, -4.0, 50.0, 50.0, 4.0], 
+                           occupancy_size=[0.5, 0.5, 0.5],
+                           occupancy_classes=11):
+    if isinstance(occ_data, np.ndarray):
+        occ_data = torch.from_numpy(occ_data)
+    
+    occ_data = occ_data.long()
+    occ_xdim = int((point_cloud_range[3] - point_cloud_range[0]) / occupancy_size[0])
+    occ_ydim = int((point_cloud_range[4] - point_cloud_range[1]) / occupancy_size[1])
+    occ_zdim = int((point_cloud_range[5] - point_cloud_range[2]) / occupancy_size[2])
+
+    voxel_num = occ_xdim * occ_ydim * occ_zdim
+
+    gt_occupancy = (torch.ones(voxel_num, dtype=torch.long) * occupancy_classes).to(occ_data.device)
+    gt_occupancy[occ_data[:, 0]] = occ_data[:, 1]
+
+    gt_occupancy = gt_occupancy.reshape(occ_zdim, occ_ydim, occ_xdim)
+
+    gt_occupancy = gt_occupancy.permute(2, 1, 0)
+    return gt_occupancy
+
+
+@PIPELINES.register_module()
+class LoadOpenSceneOccupancy(object):
+    """load occupancy GT data
+       gt_type: index_class, store the occ index and occ class in one file with shape (n, 2)
+    """
+    def __call__(self, results):
+        occ_gt_path = results['occ_gt_final_path']
+        occ_gts = torch.from_numpy(np.load(occ_gt_path))  # (n, 2)
+
+        results['voxel_semantics'] = openscene_occ_to_voxel(occ_gts).numpy()
+        return results

@@ -54,6 +54,7 @@ class BEVFormerOccHead(BaseModule):
                  bev_h=30,
                  bev_w=30,
                  loss_occ=None,
+                 lovasz_loss=None,
                  use_mask=False,
                  positional_encoding=None,
                  **kwargs):
@@ -77,6 +78,9 @@ class BEVFormerOccHead(BaseModule):
         super(BEVFormerOccHead, self).__init__()
 
         self.loss_occ = build_loss(loss_occ)
+        if lovasz_loss is not None:
+            self.loss_lovasz = build_loss(lovasz_loss)
+
         self.positional_encoding = build_positional_encoding(
             positional_encoding)
         self.transformer = build_transformer(transformer)
@@ -169,11 +173,13 @@ class BEVFormerOccHead(BaseModule):
         loss_dict=dict()
         occ=preds_dicts['occ']
         assert voxel_semantics.min()>=0 and voxel_semantics.max()<=17
-        losses = self.loss_single(voxel_semantics,mask_camera,occ)
-        loss_dict['loss_occ']=losses
+        loss_single_dict = self.loss_single(voxel_semantics,mask_camera,occ)
+        loss_dict.update(loss_single_dict)
         return loss_dict
 
     def loss_single(self,voxel_semantics,mask_camera,preds):
+        loss_dict = dict()
+
         voxel_semantics=voxel_semantics.long()
         if self.use_mask:
             voxel_semantics=voxel_semantics.reshape(-1)
@@ -184,8 +190,14 @@ class BEVFormerOccHead(BaseModule):
         else:
             voxel_semantics = voxel_semantics.reshape(-1)
             preds = preds.reshape(-1, self.num_classes)
-            loss_occ = self.loss_occ(preds, voxel_semantics,)
-        return loss_occ
+            loss_occ = self.loss_occ(preds, voxel_semantics)
+
+        if hasattr(self, 'loss_lovasz'):
+            loss_lovasz = self.loss_lovasz(F.softmax(preds, dim=1), voxel_semantics)
+            loss_dict['loss_lovasz'] = loss_lovasz
+
+        loss_dict['loss_occ'] = loss_occ
+        return loss_dict
 
     @force_fp32(apply_to=('preds'))
     def get_occ(self, preds_dicts, img_metas, rescale=False):

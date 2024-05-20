@@ -9,3 +9,4 @@ data/**/*.jpg
 ckpts/
 work_dirs/
 data/
+.vscode/
